@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Implement an aiohttp server to handle requests from the client.
 # The server listens on a unix socket, and the client connects to it.
 
@@ -9,14 +10,16 @@ import pathlib
 import datetime
 import dateparser
 from aiohttp import web
-from loguru import logger
+# from loguru import logger
+import logging
+logger = logging.getLogger(__name__) # create logger
 
-import shrpi.const
-import shrpi.i2c
+import const
+import i2c
 
 
 class RouteHandlers:
-    def __init__(self, shrpi_device: shrpi.i2c.SHRPiDevice, poweroff_command: str):
+    def __init__(self, shrpi_device: i2c.SHRPiDevice, poweroff_command: str):
         self.shrpi_device = shrpi_device
         self.poweroff_command = poweroff_command
 
@@ -27,7 +30,7 @@ class RouteHandlers:
         """Get the hardware and firmware version numbers."""
         hw_version = self.shrpi_device.hardware_version()
         fw_version = self.shrpi_device.firmware_version()
-        daemon_version = shrpi.const.VERSION
+        daemon_version = const.VERSION
 
         response = {
             "hardware_version": hw_version,
@@ -204,7 +207,7 @@ class RouteHandlers:
 
 
 async def run_http_server(
-    shrpi_device: shrpi.i2c.SHRPiDevice,
+    shrpi_device: i2c.SHRPiDevice,
     socket_path: pathlib.PosixPath,
     socket_group: int,
     poweroff: str,

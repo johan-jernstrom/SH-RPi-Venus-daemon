@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from typing import Any, Dict, List
 
 import argparse
@@ -9,9 +10,17 @@ import signal
 import sys
 
 import yaml
-from loguru import logger
+# from loguru import logger
+import logging
 
-from shrpi.const import (
+# Init logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__) # create logger
+logger.info("Logging started in daemon.py")
+logLevel = {0: 'NOTSET', 10: 'DEBUG', 20: 'INFO', 30: 'WARNING', 40: 'ERROR'}
+logger.info('Loglevel set to ' + logLevel[logging.getLogger().getEffectiveLevel()])
+
+from const import (
     CONFIG_FILE_LOCATION,
     DEFAULT_BLACKOUT_TIME_LIMIT,
     DEFAULT_BLACKOUT_VOLTAGE_LIMIT,
@@ -19,9 +28,9 @@ from shrpi.const import (
     I2C_BUS,
     VERSION,
 )
-from shrpi.i2c import DeviceNotFoundError, SHRPiDevice
-from shrpi.server import run_http_server
-from shrpi.state_machine import run_state_machine
+from i2c import DeviceNotFoundError, SHRPiDevice
+from server import run_http_server
+from state_machine import run_state_machine
 
 
 def read_config_files(

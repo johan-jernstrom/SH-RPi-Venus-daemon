@@ -1,11 +1,13 @@
+#!/usr/bin/env python
 import asyncio
 import time
 from subprocess import check_call
 
-from loguru import logger
+# from loguru import logger
+import logging
+logger = logging.getLogger(__name__) # create logger
 
-from shrpi.i2c import SHRPiDevice
-
+from i2c import SHRPiDevice
 
 async def run_state_machine(
     shrpi_device: SHRPiDevice,
@@ -29,7 +31,7 @@ async def run_state_machine(
             state = "OK"
         elif state == "OK":
             if dcin_voltage < blackout_voltage_limit:
-                logger.warning("Detected blackout")
+                logger.warning(f"Detected blackout, shutting down in {blackout_time_limit} s unless power resumes")
                 blackout_time = time.time()
                 state = "BLACKOUT"
         elif state == "BLACKOUT":

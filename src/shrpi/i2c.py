@@ -1,11 +1,7 @@
-from collections.abc import Sequence
+#!/usr/bin/env python
+from typing import Sequence # https://stackoverflow.com/questions/59955751/abcmeta-object-is-not-subscriptable-when-trying-to-annotate-a-hash-variable
 from enum import Enum
-
 from smbus2 import SMBus
-
-import shrpi.const
-
-
 class States(Enum):
     BEGIN = 0
     WAIT_FOR_POWER_ON = 1
@@ -26,10 +22,8 @@ class States(Enum):
     ENTER_SLEEP = 16
     SLEEP = 17
 
-
 class DeviceNotFoundError(Exception):
     pass
-
 
 class SHRPiDevice:
     def __init__(self, bus: int, addr: int):
@@ -205,7 +199,6 @@ class SHRPiDevice:
     def temperature(self):
         raise NotImplementedError("Temperature not implemented in base class")
 
-
 class SHRPiV1Device(SHRPiDevice):
     """
     Device interface for SH-RPi v1 hardware.
@@ -227,7 +220,6 @@ class SHRPiV1Device(SHRPiDevice):
 
     def temperature(self):
         return None
-
 
 class SHRPiV2Device(SHRPiDevice):
     """

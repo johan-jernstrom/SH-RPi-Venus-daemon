@@ -1,5 +1,92 @@
 # Sailor Hat for Raspberry Pi: Daemon
 
+## Fork SH-RPI-VENUS-DAEMON
+
+This is a fork to make the daemon work on a raspberry pi with the venus os large installed.
+
+During the modifications, the original source code was changed slightly and it might result in features not working or it not running on a pi runnig raspbian os any more.
+
+Getting it run on the Venus OS was a bit trial and error but apart from the small changes to the source code, these were the steps I made: 
+
+1. Enable I2C
+    - Add following to config (I have note yet tested activating the real time clock so that line is commented out)
+
+        ```bash
+        #### Change for Sailor Hat for Raspberry Pi https://docs.hatlabs.fi/sh-rpi/docs/software/#enabling-i2c-and-spi
+        dtparam=i2c_arm=on
+        #dtoverlay=i2c-rtc,pcf8563
+        #dtoverlay=i2c1
+        dtoverlay=gpio-poweroff,gpiopin=2,input,active_low=17
+        #### End change for Sailor Hat for Raspberry Pi
+        ```
+
+    - Copy the following overlay file to '/u-boot/overlays' (downloaded from [here](https://github.com/raspberrypi/firmware/tree/master/boot/overlays))
+        - gpio-poweroff.dtbo
+        - I also copied the i2c1.dtbo there but not sure it is needed
+
+    - On reboot the i2c-dev module should be started. Ensure "i2c-1" is listed when excecuting:
+        ```bash
+        i2cdetect -l
+        ```
+        -  If not present, a workaround is to add the file "rc.local" to the /data partition (or edit the file if it exists):
+        ```bash
+        nano /data/rc.local
+        ```
+
+        To include the following line: 
+
+            modprobe i2c-dev
+
+        Also ensure the rc.local file can be executed
+            
+            chmod 775 rc.local
+        
+        Then reboot and verify it has been added to the list.
+
+        Kudos: https://community.victronenergy.com/idea/41860/getting-i2c-running-for-humidity-and-temperature-s.html
+
+1. Install pip for python:
+    ```bash
+    opkg update 
+    opkg install python3-pip
+    ```
+
+1. Install python modules:
+    ```bash
+    python3 -m pip install pyyaml
+    python3 -m pip install smbus2
+    python3 -m pip install dateparser
+    python3 -m pip install aiohttp
+    python3 -m pip install typer
+    python3 -m pip install rich
+    ```
+    
+1. Install actual daemon service on the pi
+    - Copy all source files from '/src/shrpi' to '/data/sh-rpi-venus/'
+        - note: colorsys.py is a standard python module missing in my install for some reason. Added it here to make code execute.
+    - Ensure sufficient permissions:
+
+            chmod -R 777 /data/sh-rpi-venus/
+
+    - Copy the folder named 'sh-rpi-venus' in '/service' to BOTH '/opt/victronenergy/service' and the mounted tmpfs at '/service'
+    - Start service using command
+
+            svc -u /service/sh-rpi-venus
+
+    - Ensure service is running using command
+
+            svstat /service/sh-rpi-venus/
+
+    - Test communication with the hat using the cli, eg:
+
+            python /data/sh-rpi-venus/cli.py print
+
+1. DONE
+
+
+
+
+
 [![Dependencies Status](https://img.shields.io/badge/dependencies-up%20to%20date-brightgreen.svg)](https://github.com/hatlabs/shrpid/pulls?utf8=%E2%9C%93&q=is%3Apr%20author%3Aapp%2Fdependabot)
 
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
