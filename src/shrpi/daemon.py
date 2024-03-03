@@ -2,7 +2,6 @@
 from typing import Any, Dict, List
 
 import argparse
-import asyncio
 import grp
 import os
 import pathlib
@@ -30,7 +29,8 @@ from const import (
 )
 from i2c import DeviceNotFoundError, SHRPiDevice
 from server import run_http_server
-from state_machine import run_state_machine
+from state_machine import StateMachine
+
 
 
 def read_config_files(
@@ -51,7 +51,6 @@ def read_config_files(
             sys.exit(1)
 
     return config
-
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -106,13 +105,7 @@ def parse_arguments():
 
     return args
 
-
-async def wait_forever():
-    while True:
-        await asyncio.sleep(1)
-
-
-async def async_main():
+def main():
     args = parse_arguments()
 
     i2c_bus = args.i2c_bus
@@ -126,9 +119,7 @@ async def async_main():
 
     hw_version = shrpi_device.hardware_version()
     fw_version = shrpi_device.firmware_version()
-    logger.info(
-        f"SH-RPi device detected; HW version {hw_version}, FW version {fw_version}"
-    )
+    logger.info(f"SH-RPi device detected; HW version {hw_version}, FW version {fw_version}")
 
     blackout_time_limit = args.blackout_time_limit
     blackout_voltage_limit = args.blackout_voltage_limit
@@ -183,26 +174,10 @@ async def async_main():
     signal.signal(signal.SIGTERM, cleanup)
 
     logger.info(f"Starting shrpid version {VERSION} on {socket_path}")
+    # await run_http_server(shrpi_device, socket_path, socket_group, poweroff=args.poweroff)
 
-    # run these with asyncio:
-
-    coro1 = run_state_machine(
-        shrpi_device,
-        blackout_time_limit,
-        blackout_voltage_limit,
-        poweroff=args.poweroff,
-    )
-    coro2 = run_http_server(
-        shrpi_device, socket_path, socket_group, poweroff=args.poweroff
-    )
-    coro3 = wait_forever()
-
-    await asyncio.gather(coro1, coro2, coro3)
-
-
-def main():
-    asyncio.run(async_main())
-
+    stateMachine = StateMachine(shrpi_device, blackout_time_limit, blackout_voltage_limit, poweroff=args.poweroff)
+    stateMachine.run()
 
 if __name__ == "__main__":
     main()
