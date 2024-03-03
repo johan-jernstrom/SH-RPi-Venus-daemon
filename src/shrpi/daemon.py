@@ -31,8 +31,6 @@ from i2c import DeviceNotFoundError, SHRPiDevice
 from server import run_http_server
 from state_machine import StateMachine
 
-
-
 def read_config_files(
     parser: argparse.ArgumentParser, paths: List[str]
 ) -> Dict[str, Any]:
@@ -174,6 +172,8 @@ def main():
     signal.signal(signal.SIGTERM, cleanup)
 
     logger.info(f"Starting shrpid version {VERSION} on {socket_path}")
+
+    # Skip the HTTP server for now since it's not needed for the simple use case
     # await run_http_server(shrpi_device, socket_path, socket_group, poweroff=args.poweroff)
 
     stateMachine = StateMachine(shrpi_device, blackout_time_limit, blackout_voltage_limit, poweroff=args.poweroff)

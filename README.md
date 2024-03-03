@@ -6,10 +6,12 @@ This is a fork to make the daemon work on a raspberry pi with the venus os large
 
 During the modifications, the original source code was changed slightly and it might result in features not working or it not running on a pi runnig raspbian os any more.
 
-Getting it run on the Venus OS was a bit trial and error but apart from the small changes to the source code, these were the steps I made: 
+**NOTE:** For example the HTTP Server is disabled for now since it is not needed for the simple use case. Also, the main loop in the state machine now runs once every second instead of once every 100 ms to reduce cpu load.
+
+Getting it run on the Venus OS was a bit trial and error but apart from the small changes to the source code, these were the steps made: 
 
 1. Enable I2C
-    - Add following to config (I have note yet tested activating the real time clock so that line is commented out)
+    - Add following to config (not yet tested activating the real time clock so that line is commented out)
 
         ```bash
         #### Change for Sailor Hat for Raspberry Pi https://docs.hatlabs.fi/sh-rpi/docs/software/#enabling-i2c-and-spi
@@ -93,6 +95,7 @@ Getting it run on the Venus OS was a bit trial and error but apart from the smal
     - Restart GUI with the command:
         
             svc -t /service/gui
+    
     - Ensure the new menu item "Sailor Hat" is present in Menu/Settings/General and the page has a State, configuralbe Blackout Time Limit, Input voltage and Input current present.
 
 1. DONE

@@ -86,6 +86,7 @@ class StateMachine:
         svc.add_path('/CurrentIn', 0, writeable=True)
         svc.add_path('/ShutdownCountdown', 0, writeable=True)
         svc.add_path('/BlackoutTimeLimit', self.blackout_time_limit, writeable=True, onchangecallback = self.handle_changed_value)
+        # more device specific objects can be added here
 
         # create the setting that allows enabling the RPI shutdown pin
         settingsList = {'BlackoutTimeLimit': [ '/Settings/Sailorhat/BlackoutTimeLimit', self.blackout_time_limit, 1, 600 ]}
