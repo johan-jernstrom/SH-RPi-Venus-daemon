@@ -77,9 +77,23 @@ Getting it run on the Venus OS was a bit trial and error but apart from the smal
 
             svstat /service/sh-rpi-venus/
 
-    - Test communication with the hat using the cli, eg:
-
-            python /data/sh-rpi-venus/cli.py print
+ 1. Add GUI in venus OS:
+    - Modify /opt/victronenergy/gui/qml/PageSettingsGeneral.qml to include the following menu item:
+        ```qml
+        //////// add for sailor hat
+        MbSubMenu
+        {
+            description: qsTr("SailorHat")
+            subpage: Component { PageSailorHat {} }
+			property VBusItem stateItem: VBusItem { bind: Utils.path("com.victronenergy.sailorhat", "/State") }
+            show: stateItem.valid
+        }
+        ```
+    - Copy the file '/GUI/PageSailorHat.qml' to /opt/victronenergy/gui/qml/
+    - Restart GUI with the command:
+        
+            svc -t /service/gui
+    - Ensure the new menu item "Sailor Hat" is present in Menu/Settings/General and the page has a State, configuralbe Blackout Time Limit, Input voltage and Input current present.
 
 1. DONE
 
