@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:community.victronenergy.com)",
+      "WebFetch(domain:communityarchive.victronenergy.com)"
+    ]
+  }
+}
