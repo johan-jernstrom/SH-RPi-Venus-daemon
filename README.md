@@ -85,7 +85,7 @@ Getting it run on the Venus OS was a bit trial and error but apart from the smal
         //////// add for sailor hat
         MbSubMenu
         {
-            description: qsTr("SailorHat")
+            description: qsTr("Sailor Hat")
             subpage: Component { PageSailorHat {} }
 			property VBusItem stateItem: VBusItem { bind: Utils.path("com.victronenergy.sailorhat", "/State") }
             show: stateItem.valid
