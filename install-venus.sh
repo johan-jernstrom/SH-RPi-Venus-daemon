@@ -53,10 +53,13 @@ echo "--> Installing Python dependencies"
 opkg update
 opkg install python3-pip
 
+# setuptools>=77 requires packaging>=24.2 — install packaging first so the
+# subsequent setuptools upgrade doesn't immediately break.
+python3 -m pip install --quiet --upgrade "packaging>=24.2"
+
 # Use --no-build-isolation to avoid pip's isolated build environment, which
 # triggers a broken setuptools on Venus OS (missing tomllib in Python 3.12).
-# Upgrade setuptools first — it ships as a pre-built wheel so it bypasses the
-# broken build system, and fixes the missing tomllib issue for all subsequent installs.
+# Upgrade setuptools after packaging so it finds the required packaging version.
 python3 -m pip install --quiet --upgrade setuptools
 
 # Venus OS Python 3.12 is missing tomllib from stdlib (it was stripped).
@@ -134,7 +137,7 @@ if [ -d "$GUI_V2_DIR" ]; then
         python3 "$GUI_V2_PLUGIN_COMPILER" \
             --name "$GUI_V2_APP_NAME" \
             --settings "$(basename "$GUI_V2_SRC")" \
-            --output "$GUI_V2_APP_DIR/gui-v2/$GUI_V2_APP_NAME.json"
+            > "$GUI_V2_APP_DIR/gui-v2/$GUI_V2_APP_NAME.json"
 
         # Enable the plugin via symlink (idempotent)
         mkdir -p /data/apps/enabled
