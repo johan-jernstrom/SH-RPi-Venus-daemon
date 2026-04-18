@@ -47,11 +47,11 @@ echo "--> Installing Python dependencies"
 opkg update
 opkg install python3-pip
 
-python3 -m pip install --quiet pyyaml smbus2 dateparser typer rich
+python3 -m pip install --quiet --prefer-binary pyyaml smbus2 dateparser typer rich
 
 # aiohttp is imported but the HTTP server is disabled; install it anyway to
 # avoid import errors at startup
-python3 -m pip install --quiet aiohttp
+python3 -m pip install --quiet --prefer-binary aiohttp
 
 echo "    Python dependencies installed."
 

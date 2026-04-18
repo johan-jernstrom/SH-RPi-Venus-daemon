@@ -110,7 +110,7 @@ curl -L https://github.com/johan-jernstrom/SH-RPi-Venus-daemon/archive/refs/head
     -o sh-rpi-venus.tar.gz
 tar zxf sh-rpi-venus.tar.gz
 cd SH-RPi-Venus-daemon-main
-sudo ./install-venus.sh
+bash install-venus.sh
 ```
 
 `install-venus.sh` is safe to run repeatedly — it will overwrite the daemon source files, reinstall Python dependencies, and restart the service automatically.
