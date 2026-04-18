@@ -102,11 +102,14 @@ Getting it run on the Venus OS was a bit trial and error but apart from the smal
 
 ## Updating from GitHub
 
-To pull the latest changes and redeploy the daemon on Venus OS:
+Venus OS does not include `git`, so update by downloading a fresh copy of the repository using `curl` and re-running the installer:
 
 ```bash
-cd /path/to/SH-RPi-Venus-daemon
-git pull
+cd /tmp
+curl -L https://github.com/johan-jernstrom/SH-RPi-Venus-daemon/archive/refs/heads/main.tar.gz \
+    -o sh-rpi-venus.tar.gz
+tar zxf sh-rpi-venus.tar.gz
+cd SH-RPi-Venus-daemon-main
 sudo ./install-venus.sh
 ```
 
