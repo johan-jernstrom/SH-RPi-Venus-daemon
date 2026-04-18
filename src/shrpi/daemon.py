@@ -159,24 +159,24 @@ def main():
         # if no group is specified, use the current user's primary group
         socket_group = pathlib.PosixPath.home().stat().st_gid
 
-    def cleanup(signum, frame):
-        logger.info("Disabling SH-RPi watchdog")
-        shrpi_device.set_watchdog_timeout(0)
-        # delete the socket file
-        if socket_path.exists():
-            socket_path.unlink()
-        logger.info("shrpid exiting")
-        sys.exit(0)
-
-    signal.signal(signal.SIGINT, cleanup)
-    signal.signal(signal.SIGTERM, cleanup)
-
     logger.info(f"Starting shrpid version {VERSION} on {socket_path}")
 
     # Skip the HTTP server for now since it's not needed for the simple use case
     # await run_http_server(shrpi_device, socket_path, socket_group, poweroff=args.poweroff)
 
     stateMachine = StateMachine(shrpi_device, blackout_time_limit, blackout_voltage_limit, poweroff=args.poweroff)
+
+    def cleanup(signum, frame):
+        logger.info("Disabling SH-RPi watchdog")
+        shrpi_device.set_watchdog_timeout(0)
+        if socket_path.exists():
+            socket_path.unlink()
+        logger.info("shrpid exiting")
+        stateMachine.stop()
+
+    signal.signal(signal.SIGINT, cleanup)
+    signal.signal(signal.SIGTERM, cleanup)
+
     stateMachine.run()
 
 if __name__ == "__main__":

@@ -54,12 +54,21 @@ class StateMachine:
         self.blackout_time = 0.0
 
     def run(self):
-        self.logger.info (">>>>>>>>>>>>>>>> Starting state machine <<<<<<<<<<<<<<<<")
+        self.logger.info(">>>>>>>>>>>>>>>> Starting state machine <<<<<<<<<<<<<<<<")
         DBusGMainLoop(set_as_default=True)
-        GLib.timeout_add(1000, self.check_state)   # check every second
-        mainloop = GLib.MainLoop()
-        self.logger.info ('Connected to dbus, and switching over to GLib.MainLoop() (= event based)')
-        mainloop.run()
+        self.dbusservice = self.create_service(
+            self.shrpi_device.hardware_version(),
+            self.shrpi_device.firmware_version(),
+        )
+        GLib.timeout_add(1000, self.check_state)
+        self._mainloop = GLib.MainLoop()
+        self.logger.info('Connected to dbus, and switching over to GLib.MainLoop() (= event based)')
+        self._mainloop.run()
+
+    def stop(self):
+        self.logger.info("Stopping state machine")
+        if hasattr(self, '_mainloop'):
+            self._mainloop.quit()
 
     def create_service(self, hwVersion, fwVersion):
         servicename = "com.victronenergy.sailorhat"
@@ -105,49 +114,43 @@ class StateMachine:
         return True
 
     def check_state(self):
-        # init dbus service
-        if not hasattr(self, 'dbusservice'):
-            self.dbusservice = self.create_service(self.shrpi_device.hardware_version(), self.shrpi_device.firmware_version())
+        try:
+            dcin_voltage = self.shrpi_device.dcin_voltage()
+            dcin_current = self.shrpi_device.input_current()
+            blackoutTimeLimit = self.DbusSettings['BlackoutTimeLimit']
 
-        dcin_voltage = self.shrpi_device.dcin_voltage()
-        dcin_current = self.shrpi_device.input_current()
-        blackoutTimeLimit = self.DbusSettings['BlackoutTimeLimit']
-
-        if self.state == "START":
-            self.shrpi_device.set_watchdog_timeout(10)
-            self.state = "OK"
-        elif self.state == "OK":
-            if dcin_voltage < self.blackout_voltage_limit:
-                self.logger.warning(f"Detected blackout, shutting down in {blackoutTimeLimit} s unless power resumes")
-                self.blackout_time = time.time()
-                self.state = "BLACKOUT"
-        elif self.state == "BLACKOUT":
-            if dcin_voltage > self.blackout_voltage_limit:
-                self.logger.info("Power resumed")
+            if self.state == "START":
+                self.shrpi_device.set_watchdog_timeout(10)
                 self.state = "OK"
-            elif time.time() - self.blackout_time > blackoutTimeLimit:
-                # didn't get power back in time
-                self.logger.warning(
-                    f"Blacked out for {blackoutTimeLimit} s, shutting down"
-                )
-                self.state = "SHUTDOWN"
-        elif self.state == "SHUTDOWN":
-            if self.dry_run:
-                self.logger.warning(f"Would execute {self.poweroff}")
-            else:
-                # inform the hat about this sad state of affairs
-                self.shrpi_device.request_shutdown()
-                self.logger.info(f"Executing {self.poweroff}")
-                check_call(["sudo", self.poweroff])
-            self.state = "DEAD"
-        elif self.state == "DEAD":
-            # just wait for the inevitable
-            pass
-        
-        # Update the dbus service
-        self.dbusservice['/State'] = self.state
-        self.dbusservice['/VoltageIn'] = dcin_voltage
-        self.dbusservice['/CurrentIn'] = dcin_current
-        self.dbusservice['/ShutdownCountdown'] = blackoutTimeLimit - (time.time() - self.blackout_time) if self.state == "BLACKOUT" else 0
+            elif self.state == "OK":
+                if dcin_voltage < self.blackout_voltage_limit:
+                    self.logger.warning(f"Detected blackout, shutting down in {blackoutTimeLimit} s unless power resumes")
+                    self.blackout_time = time.time()
+                    self.state = "BLACKOUT"
+            elif self.state == "BLACKOUT":
+                if dcin_voltage > self.blackout_voltage_limit:
+                    self.logger.info("Power resumed")
+                    self.state = "OK"
+                elif time.time() - self.blackout_time > blackoutTimeLimit:
+                    self.logger.warning(f"Blacked out for {blackoutTimeLimit} s, shutting down")
+                    self.state = "SHUTDOWN"
+            elif self.state == "SHUTDOWN":
+                if self.dry_run:
+                    self.logger.warning(f"Would execute {self.poweroff}")
+                else:
+                    self.shrpi_device.request_shutdown()
+                    self.logger.info(f"Executing {self.poweroff}")
+                    check_call([self.poweroff])
+                self.state = "DEAD"
+            elif self.state == "DEAD":
+                pass
 
-        return True # keep the mainloop running
+            self.dbusservice['/State'] = self.state
+            self.dbusservice['/VoltageIn'] = dcin_voltage
+            self.dbusservice['/CurrentIn'] = dcin_current
+            self.dbusservice['/ShutdownCountdown'] = blackoutTimeLimit - (time.time() - self.blackout_time) if self.state == "BLACKOUT" else 0
+
+        except OSError as e:
+            self.logger.warning(f"I2C error (will retry next tick): {e}")
+
+        return True  # always keep the timer alive

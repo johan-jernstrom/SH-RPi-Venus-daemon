@@ -26,16 +26,16 @@ class DeviceNotFoundError(Exception):
     pass
 
 class SHRPiDevice:
-    def __init__(self, bus: int, addr: int):
+    def __init__(self, bus: int, addr: int, _hw_version: str = "", _fw_version: str = ""):
         self.bus = bus
         self.addr = addr
-        self._hardware_version = "Unknown"
-        self._firmware_version = "Unknown"
+        self._hardware_version = _hw_version or "Unknown"
+        self._firmware_version = _fw_version or "Unknown"
         self.read_analog = self.read_analog_byte  # default to v1 protocol
         self.write_analog = self.write_analog_byte  # default to v1 protocol
 
-        self.hardware_version()  # force hardware version detection
-        self.firmware_version()  # force firmware version detection
+        self.hardware_version()  # no-op if already cached via _hw_version
+        self.firmware_version()  # no-op if already cached via _fw_version
 
         self.vcap_max = 0.0
         self.dcin_max = 0.0
@@ -44,16 +44,14 @@ class SHRPiDevice:
 
     @classmethod
     def factory(cls, bus: int, addr: int) -> "SHRPiDevice":
-        temp_device = cls(bus, addr)
-        hw_ver = temp_device.hardware_version()
-
-        device: SHRPiDevice
         try:
+            probe = cls(bus, addr)
+            hw_ver = probe._hardware_version
+            fw_ver = probe._firmware_version
             if hw_ver.startswith("1."):
-                device = SHRPiV1Device(bus, addr)
+                return SHRPiV1Device(bus, addr, _hw_version=hw_ver, _fw_version=fw_ver)
             else:
-                device = SHRPiV2Device(bus, addr)
-            return device
+                return SHRPiV2Device(bus, addr, _hw_version=hw_ver, _fw_version=fw_ver)
         except OSError:
             raise DeviceNotFoundError("SH-RPi not found at I2C address %s" % addr)
 
@@ -204,8 +202,8 @@ class SHRPiV1Device(SHRPiDevice):
     Device interface for SH-RPi v1 hardware.
     """
 
-    def __init__(self, bus=1, addr=0x6D):
-        super().__init__(bus, addr)
+    def __init__(self, bus=1, addr=0x6D, **kwargs):
+        super().__init__(bus, addr, **kwargs)
         self.vcap_max = 2.75
         self.dcin_max = 32.1
 
@@ -226,8 +224,8 @@ class SHRPiV2Device(SHRPiDevice):
     Device interface for SH-RPi v2 hardware.
     """
 
-    def __init__(self, bus=1, addr=0x6D):
-        super().__init__(bus, addr)
+    def __init__(self, bus=1, addr=0x6D, **kwargs):
+        super().__init__(bus, addr, **kwargs)
         self.vcap_max = 9.35
         self.dcin_max = 32.1
         self.i_max = 2.5
