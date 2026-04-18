@@ -100,6 +100,17 @@ Getting it run on the Venus OS was a bit trial and error but apart from the smal
 
 1. DONE
 
+## Updating from GitHub
+
+To pull the latest changes and redeploy the daemon on Venus OS:
+
+```bash
+cd /path/to/SH-RPi-Venus-daemon
+git pull
+sudo ./install-venus.sh
+```
+
+`install-venus.sh` is safe to run repeatedly — it will overwrite the daemon source files, reinstall Python dependencies, and restart the service automatically.
 
 
 
