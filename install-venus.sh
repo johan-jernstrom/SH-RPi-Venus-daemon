@@ -22,9 +22,15 @@ DAEMON_DEST="/data/sh-rpi-venus"
 SERVICE_NAME="sh-rpi-venus"
 OPT_SERVICE_DIR="/opt/victronenergy/service/$SERVICE_NAME"
 LIVE_SERVICE_DIR="/service/$SERVICE_NAME"
-GUI_SRC="$REPO_ROOT/GUI/PageSailorHat.qml"
-GUI_QML_DIR="/opt/victronenergy/gui/qml"
-SETTINGS_PAGE="$GUI_QML_DIR/PageSettingsGeneral.qml"
+GUI_V1_SRC="$REPO_ROOT/GUI/PageSailorHat.qml"
+GUI_V1_QML_DIR="/opt/victronenergy/gui/qml"
+GUI_V1_SETTINGS_PAGE="$GUI_V1_QML_DIR/PageSettingsGeneral.qml"
+
+GUI_V2_SRC="$REPO_ROOT/GUI/v2/SailorHat_PageSailorHat.qml"
+GUI_V2_DIR="/opt/victronenergy/gui-v2"
+GUI_V2_PLUGIN_COMPILER="$GUI_V2_DIR/gui-v2-plugin-compiler.py"
+GUI_V2_APP_NAME="SailorHat"
+GUI_V2_APP_DIR="/data/apps/available/$GUI_V2_APP_NAME"
 
 # Bail out if not running as root
 if [ "$(id -u)" != "0" ]; then
@@ -47,11 +53,27 @@ echo "--> Installing Python dependencies"
 opkg update
 opkg install python3-pip
 
-python3 -m pip install --quiet pyyaml smbus2 dateparser typer rich
+# Use --no-build-isolation to avoid pip's isolated build environment, which
+# triggers a broken setuptools on Venus OS (missing tomllib in Python 3.12).
+# Upgrade setuptools first — it ships as a pre-built wheel so it bypasses the
+# broken build system, and fixes the missing tomllib issue for all subsequent installs.
+python3 -m pip install --quiet --upgrade setuptools
+
+# Venus OS Python 3.12 is missing tomllib from stdlib (it was stripped).
+# Install the tomli backport (pure Python, always has a wheel) and create a
+# compatibility shim so the system setuptools can import it.
+if ! python3 -c "import tomllib" 2>/dev/null; then
+    echo "    Installing tomllib shim (missing from Venus OS Python 3.12)..."
+    python3 -m pip install --quiet tomli
+    STDLIB=$(python3 -c "import sysconfig; print(sysconfig.get_path('stdlib'))")
+    printf 'from tomli import load, loads\n' > "$STDLIB/tomllib.py"
+fi
+
+python3 -m pip install --quiet --no-build-isolation pyyaml smbus2 dateparser typer rich
 
 # aiohttp is imported but the HTTP server is disabled; install it anyway to
 # avoid import errors at startup
-python3 -m pip install --quiet aiohttp
+python3 -m pip install --quiet --no-build-isolation aiohttp
 
 echo "    Python dependencies installed."
 
@@ -93,18 +115,47 @@ chmod +x "$LIVE_SERVICE_DIR/run" "$LIVE_SERVICE_DIR/log/run"
 
 echo "    Service installed in $OPT_SERVICE_DIR and $LIVE_SERVICE_DIR."
 
-# --- 4. GUI page (GUI v1 only) ---
-if [ -d "$GUI_QML_DIR" ]; then
-    echo "--> Installing GUI page"
-    cp "$GUI_SRC" "$GUI_QML_DIR/PageSailorHat.qml"
+# --- 4. GUI page ---
+if [ -d "$GUI_V2_DIR" ]; then
+    # ---- GUI v2: use the official plugin system ----
+    echo "--> Installing GUI v2 plugin"
+
+    if [ ! -f "$GUI_V2_PLUGIN_COMPILER" ]; then
+        echo "    WARNING: Plugin compiler not found at $GUI_V2_PLUGIN_COMPILER"
+        echo "    Skipping GUI plugin install. Update Venus OS and re-run to install the GUI page."
+    else
+        mkdir -p "$GUI_V2_APP_DIR/gui-v2"
+
+        # Copy the QML page into the app directory — the compiler expects it there
+        cp "$GUI_V2_SRC" "$GUI_V2_APP_DIR/gui-v2/$(basename "$GUI_V2_SRC")"
+
+        # Run the plugin compiler to generate the manifest JSON
+        # --settings adds the page under Settings → Integrations in GUI v2
+        python3 "$GUI_V2_PLUGIN_COMPILER" \
+            --name "$GUI_V2_APP_NAME" \
+            --settings "$(basename "$GUI_V2_SRC")" \
+            --output "$GUI_V2_APP_DIR/gui-v2/$GUI_V2_APP_NAME.json"
+
+        # Enable the plugin via symlink (idempotent)
+        mkdir -p /data/apps/enabled
+        ln -sfn "$GUI_V2_APP_DIR" "/data/apps/enabled/$GUI_V2_APP_NAME"
+
+        echo "    GUI v2 plugin installed. Visible under Settings → Integrations → UI Plugins."
+        echo "    Note: plugin pages are local display only — not shown in Remote Console."
+
+        echo "--> Restarting GUI"
+        svc -t /service/gui
+    fi
+
+elif [ -d "$GUI_V1_QML_DIR" ]; then
+    # ---- GUI v1: copy QML and patch PageSettingsGeneral.qml ----
+    echo "--> Installing GUI v1 page"
+    cp "$GUI_V1_SRC" "$GUI_V1_QML_DIR/PageSailorHat.qml"
 
     # Add SailorHat menu entry to PageSettingsGeneral.qml if not already present
-    if ! grep -q "PageSailorHat" "$SETTINGS_PAGE" 2>/dev/null; then
-        echo "    Patching $SETTINGS_PAGE to add SailorHat menu entry"
-        # Insert before the last closing brace of the VisibleItemModel block
-        PATCH='        \/\/\/\/\/\/\/\/ Sailor Hat\n        MbSubMenu\n        {\n            description: qsTr("SailorHat")\n            subpage: Component { PageSailorHat {} }\n            property VBusItem stateItem: VBusItem { bind: Utils.path("com.victronenergy.sailorhat", "\/State") }\n            show: stateItem.valid\n        }'
-        # Use a Python one-liner for reliable in-place editing on busybox
-        python3 - "$SETTINGS_PAGE" <<'PYEOF'
+    if ! grep -q "PageSailorHat" "$GUI_V1_SETTINGS_PAGE" 2>/dev/null; then
+        echo "    Patching $GUI_V1_SETTINGS_PAGE to add SailorHat menu entry"
+        python3 - "$GUI_V1_SETTINGS_PAGE" <<'PYEOF'
 import sys, re
 
 path = sys.argv[1]
@@ -136,10 +187,10 @@ PYEOF
 
     echo "--> Restarting GUI"
     svc -t /service/gui
+
 else
-    echo "--> GUI v2 or QML dir not found — skipping GUI page install."
-    echo "    The daemon will run and publish D-Bus data, but no GUI page will appear."
-    echo "    (GUI v2 support requires porting PageSailorHat.qml to the new framework.)"
+    echo "--> No GUI installation found — skipping GUI page install."
+    echo "    The daemon will run and protect the system without a GUI page."
 fi
 
 # --- 5. Status check ---
