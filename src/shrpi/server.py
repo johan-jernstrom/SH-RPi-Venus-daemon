@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Implement an aiohttp server to handle requests from the client.
 # The server listens on a unix socket, and the client connects to it.
 

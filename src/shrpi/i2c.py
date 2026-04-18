@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from typing import Sequence # https://stackoverflow.com/questions/59955751/abcmeta-object-is-not-subscriptable-when-trying-to-annotate-a-hash-variable
 from enum import Enum
 from smbus2 import SMBus

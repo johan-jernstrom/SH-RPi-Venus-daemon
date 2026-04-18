@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Config file for SH-RPi daemon
 CONFIG_FILE_LOCATION = "/etc/shrpid.conf"
 
