@@ -27,21 +27,20 @@ Page {
                 to: 600
                 stepSize: 1
                 suffix: " s"
-                decimals: 0
                 writeAccessLevel: VenusOS.User_AccessType_User
             }
 
             ListQuantity {
                 text: qsTr("Input voltage")
                 dataItem.uid: "dbus/com.victronenergy.sailorhat/VoltageIn"
-                decimals: 2
+                precision: 2
                 unit: VenusOS.Units_Volt_DC
             }
 
             ListQuantity {
                 text: qsTr("Input current")
                 dataItem.uid: "dbus/com.victronenergy.sailorhat/CurrentIn"
-                decimals: 2
+                precision: 2
                 unit: VenusOS.Units_Amp
             }
         }

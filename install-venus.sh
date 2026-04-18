@@ -132,12 +132,11 @@ if [ -d "$GUI_V2_DIR" ]; then
         # Copy the QML page into the app directory — the compiler expects it there
         cp "$GUI_V2_SRC" "$GUI_V2_APP_DIR/gui-v2/$(basename "$GUI_V2_SRC")"
 
-        # Run the plugin compiler to generate the manifest JSON
-        # --settings adds the page under Settings → Integrations in GUI v2
-        python3 "$GUI_V2_PLUGIN_COMPILER" \
+        # Run the plugin compiler from within the app dir — it writes NAME.json
+        # to the current working directory (no --output flag supported)
+        ( cd "$GUI_V2_APP_DIR/gui-v2" && python3 "$GUI_V2_PLUGIN_COMPILER" \
             --name "$GUI_V2_APP_NAME" \
-            --settings "$(basename "$GUI_V2_SRC")" \
-            > "$GUI_V2_APP_DIR/gui-v2/$GUI_V2_APP_NAME.json"
+            --settings "$(basename "$GUI_V2_SRC")" )
 
         # Enable the plugin via symlink (idempotent)
         mkdir -p /data/apps/enabled
@@ -147,7 +146,13 @@ if [ -d "$GUI_V2_DIR" ]; then
         echo "    Note: plugin pages are local display only — not shown in Remote Console."
 
         echo "--> Restarting GUI"
-        svc -t /service/gui
+        if [ -d /service/gui-v2 ]; then
+            svc -t /service/gui-v2
+        elif [ -d /service/gui ]; then
+            svc -t /service/gui
+        else
+            echo "    WARNING: GUI service not found — restart the GUI manually."
+        fi
     fi
 
 elif [ -d "$GUI_V1_QML_DIR" ]; then
@@ -189,7 +194,13 @@ PYEOF
     fi
 
     echo "--> Restarting GUI"
-    svc -t /service/gui
+    if [ -d /service/gui-v2 ]; then
+        svc -t /service/gui-v2
+    elif [ -d /service/gui ]; then
+        svc -t /service/gui
+    else
+        echo "    WARNING: GUI service not found — restart the GUI manually."
+    fi
 
 else
     echo "--> No GUI installation found — skipping GUI page install."
