@@ -74,33 +74,32 @@ class StateMachine:
         servicename = "com.victronenergy.sailorhat"
         connection = dbusconnection()
         self.logger.info(f"Creating dbus service {servicename} with connection {connection}")
-        svc = VeDbusService(servicename, connection)
-        
-        # Create the management objects, as specified in the ccgx dbus-api document
-        svc.add_path('/Mgmt/ProcessName', __file__)
-        svc.add_path('/Mgmt/ProcessVersion', '1.0')
-        svc.add_path('/Mgmt/Connection', 'i2c_rpi')
-        # Create the mandatory objects
-        svc.add_path('/DeviceInstance', 0)
-        svc.add_path('/ProductId', 0)
-        svc.add_path('/ProductName', 'Sailor Hat for Raspberry Pi')
-        svc.add_path('/FirmwareVersion', fwVersion)
-        svc.add_path('/HardwareVersion', hwVersion)
-        svc.add_path('/Serial', '')
-        svc.add_path('/Connected', 1)   # 1 = connected
 
-        # Create device specific objects set values to empty until connected
+        # register=False: add all paths before publishing to dbus, per Victron dbus-api convention
+        svc = VeDbusService(servicename, connection, register=False)
+
+        svc.add_mandatory_paths(
+            processname=__file__,
+            processversion='1.0',
+            connection='i2c_rpi',
+            deviceinstance=0,
+            productid=0,
+            productname='Sailor Hat for Raspberry Pi',
+            firmwareversion=fwVersion,
+            hardwareversion=hwVersion,
+            connected=1,
+        )
+        svc.add_path('/Serial', '')
         svc.add_path('/State', 'Not started', writeable=True)
         svc.add_path('/VoltageIn', 0, writeable=True)
         svc.add_path('/CurrentIn', 0, writeable=True)
         svc.add_path('/ShutdownCountdown', 0, writeable=True)
-        svc.add_path('/BlackoutTimeLimit', self.blackout_time_limit, writeable=True, onchangecallback = self.handle_changed_value)
-        # more device specific objects can be added here
+        svc.add_path('/BlackoutTimeLimit', self.blackout_time_limit, writeable=True, onchangecallback=self.handle_changed_value)
 
-        # create the setting that allows enabling the RPI shutdown pin
-        settingsList = {'BlackoutTimeLimit': [ '/Settings/Sailorhat/BlackoutTimeLimit', self.blackout_time_limit, 1, 600 ]}
-        self.DbusSettings = SettingsDevice(bus=dbus.SystemBus(), supportedSettings=settingsList, timeout = 10, eventCallback = self.handle_changed_value)
+        settingsList = {'BlackoutTimeLimit': ['/Settings/Sailorhat/BlackoutTimeLimit', self.blackout_time_limit, 1, 600]}
+        self.DbusSettings = SettingsDevice(bus=dbus.SystemBus(), supportedSettings=settingsList, timeout=10, eventCallback=self.handle_changed_value)
 
+        svc.register()
         self.logger.info(f"Created dbus service {servicename}")
         return svc
     
