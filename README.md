@@ -2,107 +2,37 @@
 
 ## Fork SH-RPI-VENUS-DAEMON
 
-This is a fork to make the daemon work on a raspberry pi with the venus os large installed.
+This is a fork to make the daemon work on a Raspberry Pi with Venus OS Large installed.
 
-During the modifications, the original source code was changed slightly and it might result in features not working or it not running on a pi runnig raspbian os any more.
+Modifications from upstream:
+- HTTP server disabled (not needed for Venus OS use case)
+- Main state machine loop runs at 1 Hz instead of 10 Hz to reduce CPU load
+- D-Bus integration for the Venus OS ecosystem
+- GUI page for both GUI v1 and GUI v2 (current Venus OS)
 
-**NOTE:** For example the HTTP Server is disabled for now since it is not needed for the simple use case. Also, the main loop in the state machine now runs once every second instead of once every 100 ms to reduce cpu load.
+### 1. Enable I2C
 
-Getting it run on the Venus OS was a bit trial and error but apart from the small changes to the source code, these were the steps made: 
+Add the following to `/u-boot/config.txt`:
 
-1. Enable I2C
-    - Add following to config (not yet tested activating the real time clock so that line is commented out)
+```
+#### Change for Sailor Hat for Raspberry Pi https://docs.hatlabs.fi/sh-rpi/docs/software/#enabling-i2c-and-spi
+dtparam=i2c_arm=on
+#dtoverlay=i2c-rtc,pcf8563
+#dtoverlay=i2c1
+dtoverlay=gpio-poweroff,gpiopin=2,input,active_low=17
+#### End change for Sailor Hat for Raspberry Pi
+```
 
-        ```bash
-        #### Change for Sailor Hat for Raspberry Pi https://docs.hatlabs.fi/sh-rpi/docs/software/#enabling-i2c-and-spi
-        dtparam=i2c_arm=on
-        #dtoverlay=i2c-rtc,pcf8563
-        #dtoverlay=i2c1
-        dtoverlay=gpio-poweroff,gpiopin=2,input,active_low=17
-        #### End change for Sailor Hat for Raspberry Pi
-        ```
+Copy the following overlay files to `/u-boot/overlays` (download from [raspberrypi/firmware](https://github.com/raspberrypi/firmware/tree/master/boot/overlays)):
+- `gpio-poweroff.dtbo`
 
-    - Copy the following overlay file to '/u-boot/overlays' (downloaded from [here](https://github.com/raspberrypi/firmware/tree/master/boot/overlays))
-        - gpio-poweroff.dtbo
-        - I also copied the i2c1.dtbo there but not sure it is needed
+On reboot, `i2c-1` should appear in `i2cdetect -l`. If not, add `modprobe i2c-dev` to `/data/rc.local` and reboot.
 
-    - On reboot the i2c-dev module should be started. Ensure "i2c-1" is listed when excecuting:
-        ```bash
-        i2cdetect -l
-        ```
-        -  If not present, a workaround is to add the file "rc.local" to the /data partition (or edit the file if it exists):
-        ```bash
-        nano /data/rc.local
-        ```
+See also: https://community.victronenergy.com/idea/41860/getting-i2c-running-for-humidity-and-temperature-s.html
 
-        To include the following line: 
+### 2. Install the daemon
 
-            modprobe i2c-dev
-
-        Also ensure the rc.local file can be executed
-            
-            chmod 775 rc.local
-        
-        Then reboot and verify it has been added to the list.
-
-        Kudos: https://community.victronenergy.com/idea/41860/getting-i2c-running-for-humidity-and-temperature-s.html
-
-1. Install pip for python:
-    ```bash
-    opkg update 
-    opkg install python3-pip
-    ```
-
-1. Install python modules:
-    ```bash
-    python3 -m pip install pyyaml
-    python3 -m pip install smbus2
-    python3 -m pip install dateparser
-    python3 -m pip install aiohttp
-    python3 -m pip install typer
-    python3 -m pip install rich
-    ```
-    
-1. Install actual daemon service on the pi
-    - Copy all source files from '/src/shrpi' to '/data/sh-rpi-venus/'
-        - note: colorsys.py is a standard python module missing in my install for some reason. Added it here to make code execute.
-    - Ensure sufficient permissions:
-
-            chmod -R 777 /data/sh-rpi-venus/
-
-    - Copy the folder named 'sh-rpi-venus' in '/service' to BOTH '/opt/victronenergy/service' and the mounted tmpfs at '/service'
-    - Start service using command
-
-            svc -u /service/sh-rpi-venus
-
-    - Ensure service is running using command
-
-            svstat /service/sh-rpi-venus/
-
- 1. Add GUI in venus OS:
-    - Modify /opt/victronenergy/gui/qml/PageSettingsGeneral.qml to include the following menu item:
-        ```qml
-        //////// add for sailor hat
-        MbSubMenu
-        {
-            description: qsTr("Sailor Hat")
-            subpage: Component { PageSailorHat {} }
-			property VBusItem stateItem: VBusItem { bind: Utils.path("com.victronenergy.sailorhat", "/State") }
-            show: stateItem.valid
-        }
-        ```
-    - Copy the file '/GUI/PageSailorHat.qml' to /opt/victronenergy/gui/qml/
-    - Restart GUI with the command:
-        
-            svc -t /service/gui
-    
-    - Ensure the new menu item "Sailor Hat" is present in Menu/Settings/General and the page has a State, configuralbe Blackout Time Limit, Input voltage and Input current present.
-
-1. DONE
-
-## Updating from GitHub
-
-Venus OS does not include `git`, so update by downloading a fresh copy of the repository using `curl` and re-running the installer:
+Venus OS does not include `git`, so download the repository as a tarball and run the installer:
 
 ```bash
 cd /tmp
@@ -113,7 +43,34 @@ cd SH-RPi-Venus-daemon-main
 bash install-venus.sh
 ```
 
-`install-venus.sh` is safe to run repeatedly — it will overwrite the daemon source files, reinstall Python dependencies, and restart the service automatically.
+`install-venus.sh` handles everything:
+- Installs Python dependencies via `opkg` and `pip`
+- Copies daemon source files to `/data/sh-rpi-venus/`
+- Creates the daemontools service in `/opt/victronenergy/service/` and `/service/`
+- Installs the GUI page (GUI v2 preferred, falls back to GUI v1)
+
+The script is safe to re-run after a Venus OS update.
+
+### 3. Verify
+
+```bash
+svstat /service/sh-rpi-venus
+tail -f /var/log/sh-rpi-venus/current
+```
+
+The SailorHat page is visible under **Settings → Integrations → UI Plugins** (GUI v2) or **Settings → General → Sailor Hat** (GUI v1).
+
+### Service management
+
+```bash
+svc -t /service/sh-rpi-venus   # restart
+svc -d /service/sh-rpi-venus   # stop
+svc -u /service/sh-rpi-venus   # start
+```
+
+## Updating
+
+Re-run the same install commands from step 2 above. `install-venus.sh` is idempotent — it overwrites source files, reinstalls Python dependencies, and restarts the service.
 
 
 
